@@ -5,6 +5,9 @@ import type { Exercice } from '$lib/exercices/types';
 import { situations } from '$lib/situations';
 import { ErreurExecution, executer, type Pas } from './interpreteur';
 
+/** Temps laissé à la scène pour revenir à son état de départ avant de rejouer. */
+const PAUSE_RETOUR = 500;
+
 export type Statut = 'pret' | 'lecture' | 'pause' | 'fini';
 
 export interface Message {
@@ -60,9 +63,13 @@ export class Controleur {
 
 	lancer() {
 		if (this.statut === 'lecture') return;
+		// Après une exécution, la scène revient d'abord (visiblement) au départ.
+		const retour = this.statut === 'fini';
 		if (!this.enCours && !this.#preparer()) return;
 		this.statut = 'lecture';
-		this.#boucle();
+		if (this.#minuteur) return; // le premier pas est déjà programmé
+		if (retour) this.#programmer(PAUSE_RETOUR);
+		else this.#boucle();
 	}
 
 	pause() {
@@ -74,17 +81,29 @@ export class Controleur {
 	/** Exécute le bloc suivant. */
 	pas() {
 		if (this.statut === 'lecture') return this.pause();
+		if (this.#minuteur) return; // retour au départ en cours
+		const retour = this.statut === 'fini';
 		if (!this.enCours && !this.#preparer()) return;
-		this.#avancer();
+		if (retour) this.#programmer(PAUSE_RETOUR);
+		else this.#avancer();
 	}
 
 	detruire() {
 		this.#arreterMinuteur();
 	}
 
+	/** Programme le pas suivant (en lecture continue) ou un seul pas (en pas à pas). */
+	#programmer(ms: number) {
+		this.#minuteur = setTimeout(() => {
+			this.#minuteur = null;
+			if (this.statut === 'lecture') this.#boucle();
+			else this.#avancer();
+		}, ms);
+	}
+
 	#boucle = () => {
 		if (this.statut !== 'lecture') return;
-		if (this.#avancer()) this.#minuteur = setTimeout(this.#boucle, this.delai);
+		if (this.#avancer()) this.#programmer(this.delai);
 	};
 
 	#arreterMinuteur() {
