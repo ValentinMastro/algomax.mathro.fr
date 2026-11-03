@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import { transition } from '$lib/transition.svelte';
 	import { clonerProgramme, programme as programmeVide } from '$lib/blocs/construire';
 	import { compterBlocs, pilePrincipale } from '$lib/blocs/operations';
 	import type { Pile } from '$lib/blocs/types';
@@ -49,6 +50,14 @@
 
 	const nbBlocs = $derived(compterBlocs(pilePrincipale(programme)?.blocs ?? []));
 	const duree = $derived(Math.min(320, ctrl.delai * 0.8));
+
+	/** Passe à l'exercice suivant avec la transition animée. */
+	function allerAuSuivant(e: MouseEvent) {
+		if (!suivant) return;
+		if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+		e.preventDefault();
+		transition.lancer(`${base}/${suivant.id}`, ex.id, suivant.id);
+	}
 
 	let indice = $state(false);
 	let confirmerEffacement = $state(false);
@@ -167,7 +176,9 @@
 				<div class="message {ctrl.message.genre}" role="status">
 					<p>{ctrl.message.texte}</p>
 					{#if ctrl.reussi && suivant}
-						<a class="suivant" href="{base}/{suivant.id}">Exercice suivant →</a>
+						<a class="suivant" href="{base}/{suivant.id}" onclick={allerAuSuivant}
+							>Exercice suivant →</a
+						>
 					{:else if ctrl.reussi}
 						<a class="suivant" href={base}>Tu as terminé la série ! 🎉</a>
 					{/if}

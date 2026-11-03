@@ -1,32 +1,58 @@
 <script lang="ts">
 	import { sixieme } from '$lib/exercices/sixieme';
 	import { progression } from '$lib/progression.svelte';
-	import { categories } from '$lib/blocs/catalogue';
+	import { couleurSequence } from '$lib/exercices/couleurs';
+	import { transition } from '$lib/transition.svelte';
 
 	const icones = { robot: '🤖', crayon: '✏️', suites: '🔢' };
-	const couleurs = ['mouvement', 'controle', 'stylo', 'variables'] as const;
 	let numero = 0;
 	const sequences = sixieme.sequences.map((s) => ({
 		...s,
 		exercices: s.exercices.map((e) => ({ ...e, numero: ++numero }))
 	}));
+
+	type ExerciceNumerote = (typeof sequences)[number]['exercices'][number];
+
+	/** Ouvre l'exercice avec l'animation d'entrée (clic simple uniquement). */
+	function ouvrir(e: MouseEvent, ex: ExerciceNumerote, s: (typeof sequences)[number], i: number) {
+		if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+		e.preventDefault();
+		const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		transition.ouvrir({
+			url: `/6e/${ex.id}`,
+			rect: { x: r.left, y: r.top, l: r.width, h: r.height },
+			numero: ex.numero,
+			titre: ex.titre,
+			sequence: `Séquence ${s.id} · ${s.titre}`,
+			couleur: couleurSequence(i + 1),
+			icone: icones[ex.situation]
+		});
+	}
+
+	const choisi = $derived(transition.ouverture?.url);
 </script>
 
 <svelte:head>
 	<title>Algomax — 6ème</title>
 </svelte:head>
 
-<main>
+<main class:depart={!!choisi}>
 	<a class="retour" href="/">← Accueil</a>
 	<h1>Programmer en 6ème</h1>
 
 	{#each sequences as s, i (s.id)}
-		<section style:--c={categories[couleurs[i % couleurs.length]].couleur}>
+		<section style:--c={couleurSequence(i + 1)}>
 			<h2><span class="badge">{s.id}</span> {s.titre}</h2>
 			<p class="theme">{s.theme}</p>
 			<div class="exercices">
 				{#each s.exercices as e (e.id)}
-					<a class="exercice card" class:reussi={progression.estReussi(e.id)} href="/6e/{e.id}">
+					<a
+						class="exercice card"
+						class:reussi={progression.estReussi(e.id)}
+						class:choisi={choisi === `/6e/${e.id}`}
+						href="/6e/{e.id}"
+						onclick={(ev) => ouvrir(ev, e, s, i)}
+					>
 						<span class="numero">{e.numero}</span>
 						<span class="nom">{e.titre}</span>
 						<span class="icone" title={e.situation}>{icones[e.situation]}</span>
@@ -39,6 +65,25 @@
 </main>
 
 <style>
+	/* Pendant l'ouverture d'un exercice, le reste de la page s'efface. */
+	main > :global(*) {
+		transition:
+			opacity 0.35s ease,
+			transform 0.35s ease;
+	}
+	.depart > :global(*:not(section)),
+	.depart .theme,
+	.depart h2,
+	.depart .exercice:not(.choisi) {
+		opacity: 0;
+		transform: scale(0.92);
+		transition:
+			opacity 0.35s ease,
+			transform 0.35s ease;
+	}
+	.depart .exercice.choisi {
+		visibility: hidden;
+	}
 	main {
 		max-width: 1000px;
 		margin: 0 auto;
