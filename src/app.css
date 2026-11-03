@@ -1,0 +1,106 @@
+:root {
+	/* Palette neutre */
+	--bg: #f4f6fb;
+	--surface: #ffffff;
+	--surface-2: #f8fafc;
+	--border: #e2e8f0;
+	--text: #1f2a44;
+	--text-soft: #5b6678;
+	--accent: #2563eb;
+	--accent-soft: #dbeafe;
+
+	/* Couleurs des cartes d'outils (charte de mathro.fr) */
+	--bleu: #1d4ed8;
+	--vert: #047857;
+	--rouge: #b91c1c;
+
+	--radius: 12px;
+	--shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 8px 24px rgba(16, 24, 40, 0.06);
+
+	font-family:
+		'Segoe UI',
+		system-ui,
+		-apple-system,
+		Roboto,
+		Helvetica,
+		Arial,
+		sans-serif;
+	color: var(--text);
+	background: var(--bg);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	min-height: 100%;
+}
+
+h1,
+h2,
+h3 {
+	color: var(--text);
+	line-height: 1.2;
+}
+
+a {
+	color: inherit;
+	text-decoration: none;
+}
+
+button {
+	font: inherit;
+	cursor: pointer;
+}
+
+.btn {
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	padding: 0.6rem 1.1rem;
+	border-radius: 10px;
+	font-weight: 600;
+	transition:
+		transform 0.06s ease,
+		background 0.15s ease,
+		box-shadow 0.15s ease;
+}
+.btn:hover {
+	box-shadow: var(--shadow);
+}
+.btn:active {
+	transform: translateY(1px);
+}
+.btn-primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+.btn-primary:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.btn-ghost {
+	background: transparent;
+	border-color: transparent;
+}
+
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow);
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
