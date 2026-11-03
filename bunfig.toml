@@ -1,0 +1,4 @@
+# `bun run <script>` exécute les binaires (vite, vitest, svelte-check…) avec le
+# runtime bun plutôt qu'avec node, même s'ils ont un shebang `#!/usr/bin/env node`.
+[run]
+bun = true
