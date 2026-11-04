@@ -1,26 +1,13 @@
 // Progression de l'élève et programmes en cours, gardés dans le navigateur.
-// Tout est protégé : l'application fonctionne même sans stockage disponible.
 import { catalogue } from '$lib/blocs/catalogue';
 import { typesUtilises } from '$lib/blocs/operations';
 import type { Pile } from '$lib/blocs/types';
+import { ecrire, lire } from './stockage';
 
-const PREFIXE = 'algomax:';
-
-function lire<T>(cle: string, defaut: T): T {
-	try {
-		const v = localStorage.getItem(PREFIXE + cle);
-		return v ? (JSON.parse(v) as T) : defaut;
-	} catch {
-		return defaut;
-	}
-}
-
-function ecrire(cle: string, valeur: unknown) {
-	try {
-		localStorage.setItem(PREFIXE + cle, JSON.stringify(valeur));
-	} catch {
-		// Stockage indisponible (navigation privée…) : tant pis.
-	}
+/** Réussites d'affilée sur les versions d'un exercice, pour une graine donnée. */
+interface Serie {
+	graine: number;
+	reussites: number;
 }
 
 class Progression {
@@ -34,6 +21,26 @@ class Progression {
 		if (this.estReussi(id)) return;
 		this.reussis.push(id);
 		ecrire('reussis', this.reussis);
+	}
+
+	series = $state<Record<string, Serie>>(lire('series', {}));
+
+	/** Nombre de versions réussies d'affilée avec cette graine (0 si la graine a changé). */
+	reussites(id: string, graine: number): number {
+		const s = this.series[id];
+		return s && s.graine === graine && Number.isInteger(s.reussites) ? s.reussites : 0;
+	}
+
+	/**
+	 * Enregistre la réussite d'une version ; l'exercice est validé quand
+	 * `aReussir` versions ont été réussies. Renvoie le nouveau nombre de réussites.
+	 */
+	reussir(id: string, graine: number, aReussir: number): number {
+		const n = Math.min(aReussir, this.reussites(id, graine) + 1);
+		this.series[id] = { graine, reussites: n };
+		ecrire('series', this.series);
+		if (n >= aReussir) this.marquer(id);
+		return n;
 	}
 }
 

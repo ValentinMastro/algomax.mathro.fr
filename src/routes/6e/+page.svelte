@@ -3,6 +3,8 @@
 	import { progression } from '$lib/progression.svelte';
 	import { couleurSequence } from '$lib/exercices/couleurs';
 	import { transition } from '$lib/transition.svelte';
+	import { VERSIONS, versionsAReussir } from '$lib/exercices/variantes';
+	import { graine } from '$lib/graine.svelte';
 
 	const icones = { robot: '🤖', crayon: '✏️', suites: '🔢' };
 	let numero = 0;
@@ -39,6 +41,11 @@
 <main class:depart={!!choisi}>
 	<a class="retour" href="/">← Accueil</a>
 	<h1>Programmer en 6ème</h1>
+	<p class="graine">
+		Chaque exercice se valide en réussissant <strong>{VERSIONS} versions d’affilée</strong>. Graine
+		:
+		<a href="/graine">{graine.valeur}</a>
+	</p>
 
 	{#each sequences as s, i (s.id)}
 		<section style:--c={couleurSequence(i + 1)}>
@@ -56,7 +63,16 @@
 						<span class="numero">{e.numero}</span>
 						<span class="nom">{e.titre}</span>
 						<span class="icone" title={e.situation}>{icones[e.situation]}</span>
-						{#if progression.estReussi(e.id)}<span class="coche">✓</span>{/if}
+						{#if progression.estReussi(e.id)}
+							<span class="coche">✓</span>
+						{:else if progression.reussites(e.id, graine.valeur) > 0}
+							{@const n = progression.reussites(e.id, graine.valeur)}
+							<span class="points" title="{n} version{n > 1 ? 's' : ''} réussie{n > 1 ? 's' : ''}">
+								{#each { length: versionsAReussir(e) }, k (k)}
+									<span class:gagne={k < n}></span>
+								{/each}
+							</span>
+						{/if}
 					</a>
 				{/each}
 			</div>
@@ -146,6 +162,31 @@
 	.nom {
 		flex: 1;
 		font-weight: 600;
+	}
+	.graine {
+		margin: -8px 0 24px;
+		color: var(--text-soft);
+	}
+	.graine a {
+		font-weight: 700;
+		color: var(--accent);
+	}
+	.points {
+		position: absolute;
+		top: -5px;
+		right: 8px;
+		display: flex;
+		gap: 3px;
+	}
+	.points span {
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+		background: #d1d5db;
+		border: 1.5px solid var(--surface);
+	}
+	.points span.gagne {
+		background: var(--vert);
 	}
 	.coche {
 		position: absolute;

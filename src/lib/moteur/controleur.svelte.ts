@@ -49,6 +49,12 @@ export class Controleur {
 		return this.statut === 'lecture' || this.statut === 'pause';
 	}
 
+	/** Passe à une autre version de l'exercice (le programme de l'élève est conservé). */
+	charger(exercice: Exercice) {
+		this.#exercice = exercice;
+		this.reinitialiser();
+	}
+
 	reinitialiser() {
 		this.#arreterMinuteur();
 		this.#gen = null;

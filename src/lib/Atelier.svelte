@@ -5,8 +5,11 @@
 	import { compterBlocs, pilePrincipale } from '$lib/blocs/operations';
 	import type { Pile } from '$lib/blocs/types';
 	import Editeur from '$lib/editeur/Editeur.svelte';
-	import type { Exercice, Sequence } from '$lib/exercices/types';
+	import type { ModeleExercice, Sequence } from '$lib/exercices/types';
+	import { versions, versionsAReussir } from '$lib/exercices/variantes';
+	import { graine } from '$lib/graine.svelte';
 	import { Controleur } from '$lib/moteur/controleur.svelte';
+	import Reussite from '$lib/Reussite.svelte';
 	import { chargerProgramme, progression, sauverProgramme } from '$lib/progression.svelte';
 	import SceneCrayon from '$lib/situations/crayon/SceneCrayon.svelte';
 	import type { EtatCrayon } from '$lib/situations/crayon/crayon';
@@ -16,7 +19,7 @@
 	import { formater, type EtatSuites } from '$lib/situations/suites/suites';
 	import { enrichir } from '$lib/texte';
 
-	type ExerciceSitue = Exercice & { sequence: Sequence };
+	type ExerciceSitue = ModeleExercice & { sequence: Sequence };
 
 	let {
 		exercice,
@@ -35,18 +38,76 @@
 
 	// L'atelier est recréé à chaque changement d'exercice (cf. {#key} dans la page).
 	// svelte-ignore state_referenced_locally
-	const ex = exercice;
+	const modele = exercice;
+
+	// Versions de l'exercice : elles ne dépendent que de la graine.
+	const g = graine.valeur;
+	const lesVersions = versions(modele, g);
+	const aReussir = versionsAReussir(modele);
+	const valide = $derived(progression.estReussi(modele.id));
+	const reussies = $derived(progression.reussites(modele.id, g));
+
+	/** Version en cours : la prochaine à réussir (ou la première si l'exercice est validé). */
+	let rang = $state(
+		progression.estReussi(modele.id)
+			? 0
+			: Math.min(progression.reussites(modele.id, g), aReussir - 1)
+	);
+	const ex = $derived(lesVersions[rang]);
 
 	const depart = () => clonerProgramme(ex.programmeInitial ?? programmeVide());
-	let programme = $state<Pile[]>(chargerProgramme(ex.id) ?? depart());
-	$effect(() => sauverProgramme(ex.id, $state.snapshot(programme)));
+	let programme = $state<Pile[]>(chargerProgramme(modele.id) ?? depart());
+	$effect(() => sauverProgramme(modele.id, $state.snapshot(programme)));
 
-	const ctrl = new Controleur(
-		ex,
-		() => programme,
-		() => progression.marquer(ex.id)
-	);
-	onDestroy(() => ctrl.detruire());
+	// svelte-ignore state_referenced_locally
+	const ctrl = new Controleur(ex, () => programme, surReussite);
+
+	/** Durée de la célébration avant de passer à la version suivante. */
+	const DUREE_CELEBRATION = 2000;
+	let celebration = $state<{ cle: number; reussites: number } | null>(null);
+	/** Une nouvelle version va être proposée : on ne relance pas le programme d'ici là. */
+	let bascule = $state(false);
+	const minuteurs = new Set<ReturnType<typeof setTimeout>>();
+	const plusTard = (f: () => void, ms: number) => {
+		const m = setTimeout(() => {
+			minuteurs.delete(m);
+			f();
+		}, ms);
+		minuteurs.add(m);
+	};
+	onDestroy(() => {
+		ctrl.detruire();
+		minuteurs.forEach(clearTimeout);
+	});
+
+	function surReussite() {
+		const dejaValide = progression.estReussi(modele.id);
+		const n = progression.reussir(modele.id, g, aReussir);
+		const cle = Date.now();
+		celebration = { cle, reussites: dejaValide ? aReussir : n };
+		const duree = n >= aReussir ? DUREE_CELEBRATION + 600 : DUREE_CELEBRATION;
+		plusTard(() => {
+			if (celebration?.cle === cle) celebration = null;
+		}, duree);
+		if (!dejaValide && n < aReussir) {
+			bascule = true;
+			plusTard(() => {
+				bascule = false;
+				changerDeVersion(n);
+				ctrl.message = {
+					genre: 'info',
+					texte: `Version ${n + 1} sur ${aReussir} : la situation a changé, adapte ton programme !`
+				};
+			}, duree);
+		}
+	}
+
+	function changerDeVersion(r: number) {
+		rang = r;
+		ctrl.charger(lesVersions[r]);
+		// Un programme de départ imposé (exercice « trouve l'erreur »…) change avec la version.
+		if (lesVersions[r].programmeInitial) programme = depart();
+	}
 
 	const nbBlocs = $derived(compterBlocs(pilePrincipale(programme)?.blocs ?? []));
 	const duree = $derived(Math.min(320, ctrl.delai * 0.8));
@@ -78,11 +139,30 @@
 	<header>
 		<a class="retour" href={base}>← Exercices</a>
 		<div class="titre">
-			<span class="sequence">Séquence {ex.sequence.id} · {ex.sequence.titre}</span>
+			<span class="sequence">Séquence {modele.sequence.id} · {modele.sequence.titre}</span>
 			<h1>
 				<span class="numero">{numero}</span>
-				{ex.titre}
-				{#if progression.estReussi(ex.id)}<span class="coche" title="Exercice réussi">✓</span>{/if}
+				{modele.titre}
+				{#if valide}<span class="coche" title="Exercice réussi">✓</span>{/if}
+				{#if aReussir > 1}
+					<span
+						class="versions"
+						title={valide
+							? 'Exercice validé : clique sur une boule pour rejouer une version'
+							: `Réussis ${aReussir} versions d’affilée pour valider l’exercice`}
+					>
+						{#each lesVersions as _, i (i)}
+							<button
+								class="point"
+								class:gagne={valide || i < reussies}
+								class:courant={i === rang}
+								disabled={!valide || ctrl.enCours || bascule || i === rang}
+								onclick={() => changerDeVersion(i)}
+								aria-label="Version {i + 1}{valide || i < reussies ? ' (réussie)' : ''}"
+							></button>
+						{/each}
+					</span>
+				{/if}
 			</h1>
 		</div>
 		<nav>
@@ -131,10 +211,14 @@
 				{#if ctrl.statut === 'lecture'}
 					<button class="principal" onclick={() => ctrl.pause()}>⏸ Pause</button>
 				{:else}
-					<button class="principal" onclick={() => ctrl.lancer()}>▶ Exécuter</button>
+					<button class="principal" onclick={() => ctrl.lancer()} disabled={bascule}
+						>▶ Exécuter</button
+					>
 				{/if}
-				<button onclick={() => ctrl.pas()} title="Exécuter le bloc suivant">⏭ Pas à pas</button>
-				<button onclick={() => ctrl.reinitialiser()}>⏹ Réinitialiser</button>
+				<button onclick={() => ctrl.pas()} title="Exécuter le bloc suivant" disabled={bascule}
+					>⏭ Pas à pas</button
+				>
+				<button onclick={() => ctrl.reinitialiser()} disabled={bascule}>⏹ Réinitialiser</button>
 				<label class="vitesse">
 					<span>🐢</span>
 					<input
@@ -175,11 +259,11 @@
 			{#if ctrl.message}
 				<div class="message {ctrl.message.genre}" role="status">
 					<p>{ctrl.message.texte}</p>
-					{#if ctrl.reussi && suivant}
+					{#if ctrl.reussi && valide && suivant}
 						<a class="suivant" href="{base}/{suivant.id}" onclick={allerAuSuivant}
 							>Exercice suivant →</a
 						>
-					{:else if ctrl.reussi}
+					{:else if ctrl.reussi && valide}
 						<a class="suivant" href={base}>Tu as terminé la série ! 🎉</a>
 					{/if}
 				</div>
@@ -187,6 +271,12 @@
 		</aside>
 	</div>
 </div>
+
+{#if celebration}
+	{#key celebration.cle}
+		<Reussite reussites={celebration.reussites} total={aReussir} />
+	{/key}
+{/if}
 
 <style>
 	.atelier {
@@ -234,6 +324,33 @@
 	}
 	.coche {
 		color: var(--vert);
+	}
+	.versions {
+		display: inline-flex;
+		gap: 5px;
+		margin-left: 4px;
+	}
+	.point {
+		width: 14px;
+		height: 14px;
+		padding: 0;
+		border-radius: 50%;
+		border: none;
+		background: #d1d5db;
+		box-shadow: inset 0 -2px 3px rgb(0 0 0 / 0.12);
+	}
+	.point.gagne {
+		background: var(--vert);
+	}
+	.point.courant {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.point:disabled {
+		cursor: default;
+	}
+	.point:not(:disabled):hover {
+		transform: scale(1.2);
 	}
 	nav {
 		display: flex;
@@ -337,15 +454,19 @@
 		padding: 7px 12px;
 		font-weight: 600;
 	}
-	button:hover {
+	button:not(.point):hover:not(:disabled) {
 		background: var(--surface-2);
+	}
+	button:disabled:not(.point) {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 	button.principal {
 		background: var(--vert);
 		border-color: var(--vert);
 		color: #fff;
 	}
-	button.principal:hover {
+	button.principal:hover:not(:disabled) {
 		background: #065f46;
 	}
 	button.secondaire {
