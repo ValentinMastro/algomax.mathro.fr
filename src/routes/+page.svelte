@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { exercicesSixieme } from '$lib/exercices/sixieme';
 	import { progression } from '$lib/progression.svelte';
+	import { graine } from '$lib/graine.svelte';
 
 	const reussis = $derived(exercicesSixieme.filter((e) => progression.estReussi(e.id)).length);
 </script>
@@ -32,6 +33,10 @@
 			</div>
 		{/each}
 	</div>
+
+	<p class="graine">
+		Graine des exercices : <a href="/graine">{graine.valeur}</a>
+	</p>
 </main>
 
 <style>
@@ -79,6 +84,15 @@
 	}
 	.detail {
 		color: var(--text-soft);
+	}
+	.graine {
+		margin-top: 32px;
+		text-align: center;
+		color: var(--text-soft);
+	}
+	.graine a {
+		font-weight: 700;
+		color: var(--accent);
 	}
 	.bientot {
 		opacity: 0.5;
